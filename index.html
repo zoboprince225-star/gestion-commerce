@@ -1,0 +1,120 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Gestion Commerce</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#1976d2"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f4f6fa;--c:#fff;--t:#1a1a1a;--m:#667;--p:#1976d2;--g:#2e9e4f;--r:#e0443e;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111;--c:#1e1e1e;--t:#eee;--m:#999;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111;--c:#1e1e1e;--t:#eee;--m:#999;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--t)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--p);z-index:10}
+header{background:var(--p);color:#fff;padding:12px 14px;font-weight:700;display:flex;justify-content:space-between;align-items:center;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+header small{color:#fffc;font-weight:400}
+main{padding:10px 10px 84px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--c);border-top:1px solid #8884;padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+nav a{flex:1;text-align:center;font-size:10px;padding:6px 0;color:var(--m)}nav a.on{color:var(--p);font-weight:700}
+.card,.card2{background:var(--c);border-radius:10px;padding:10px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:8px}.card2{display:block}
+input,select,textarea{width:100%;padding:11px;margin:4px 0;border:1px solid #8886;border-radius:8px;background:var(--c);color:var(--t);font:inherit}
+button{width:100%;padding:12px;margin:4px 0;border:0;border-radius:8px;background:var(--p);color:#fff;font:inherit;font-weight:700}
+button.r{background:var(--r)}button.ok{background:var(--g)}button.gr{background:#888}
+.chips{display:flex;gap:6px;overflow-x:auto;margin:4px 0}.chips b{padding:6px 12px;border-radius:16px;background:var(--c);font-weight:400;white-space:nowrap}.chips b.on{background:var(--p);color:#fff}
+.tot{display:flex;text-align:center;background:var(--c);border-radius:10px;margin:6px 0}.tot div{flex:1;padding:8px;font-weight:700;font-size:13px}
+.g{color:var(--g)}.r{color:var(--r)}.m,small{color:var(--m)}
+.row{display:flex;justify-content:space-between;gap:6px;align-items:center;margin:4px 0}.row b{padding:2px 10px;background:#8883;border-radius:6px}
+.ov{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:20;padding:14px}.box{background:var(--c);border-radius:12px;padding:14px;width:100%;max-height:90%;overflow:auto}
+.login{max-width:340px;margin:12vh auto;padding:14px}img.th{width:44px;height:44px;border-radius:8px;object-fit:cover}
+pre{font-size:11px;overflow-x:auto;background:#8882;padding:8px}h4{margin:8px 0 4px}
+</style></head><body><div id="app"></div><div id="m"></div>
+<script>
+const $=s=>document.querySelector(s),K='gc1';
+let S,U=null,V='caisse',P='month',R=['',''],cart=[],q='',img='',cf,bv;
+function load(){try{S=JSON.parse(localStorage.getItem(K))}catch(e){}S=S||{shop:'Mon Commerce',users:[],items:[],tx:[],log:[],dark:0,cur:'FCFA'}}
+function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){al('Stockage plein : supprimez des photos ou sauvegardez vos données.')}}
+async function h(s){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('gc'+s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return btoa(unescape(encodeURIComponent(s)))}}
+const id=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const fm=n=>(+n||0).toLocaleString('fr-FR')+' '+S.cur;
+const fd=t=>new Date(t).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'});
+const log=a=>{S.log.push({t:Date.now(),u:U?U.name:'-',a});save()};
+const adm=()=>U&&U.role=='admin';
+const th=()=>document.documentElement.dataset.theme=S.dark?'dark':'light';
+const sum=(l,ty)=>l.filter(t=>t.type==ty).reduce((s,t)=>s+t.total,0);
+const mg=l=>l.filter(t=>t.type=='sale').reduce((s,t)=>s+t.lines.reduce((x,i)=>x+(i.p-i.c)*i.q,0),0);
+const im=i=>i.img?`<img class="th" src="${i.img}">`:'<span style="font-size:30px">📦</span>';
+function modal(x){$('#m').innerHTML='<div class="ov"><div class="box">'+x+'</div></div>'}
+const cm=()=>$('#m').innerHTML='';
+const al=m=>modal(`<p>${m}</p><button onclick="cm()">OK</button>`);
+function conf(m,f){cf=f;modal(`<p>${m}</p><button class="r" onclick="cm();cf()">Oui</button><button class="gr" onclick="cm()">Non</button>`)}
+function rg(){const n=new Date(),y=n.getFullYear(),m=n.getMonth(),d=n.getDate();
+ if(P=='day')return[new Date(y,m,d),new Date(y,m,d+1)];
+ if(P=='week'){const w=(n.getDay()+6)%7;return[new Date(y,m,d-w),new Date(y,m,d-w+7)]}
+ if(P=='month')return[new Date(y,m,1),new Date(y,m+1,1)];
+ if(P=='year')return[new Date(y,0,1),new Date(y+1,0,1)];
+ if(P=='range'&&R[0]&&R[1])return[new Date(R[0]+'T00:00'),new Date(new Date(R[1]+'T00:00').getTime()+864e5)];
+ return[new Date(0),new Date(9e12)]}
+const tx=()=>{const[a,b]=rg();return S.tx.filter(t=>t.t>=a&&t.t<b&&!t.void&&(adm()||t.by==U.name))};
+const chips=()=>`<div class="chips">${[['day','Jour'],['week','Semaine'],['month','Mois'],['year','Année'],['all','Tout'],['range','Plage de dates']].map(p=>`<b class="${P==p[0]?'on':''}" onclick="P='${p[0]}';render()">${p[1]}</b>`).join('')}</div>${P=='range'?`<div class="row"><input type="date" value="${R[0]}" onchange="R[0]=this.value;render()"><input type="date" value="${R[1]}" onchange="R[1]=this.value;render()"></div>`:''}`;
+function buckets(l){let key,L;const r0=rg()[0];
+ if(P=='day'){L=[...Array(24).keys()];key=t=>new Date(t).getHours()}
+ else if(P=='week'){L=['L','M','M','J','V','S','D'];key=t=>(new Date(t).getDay()+6)%7}
+ else if(P=='month'){L=[...Array(new Date(r0.getFullYear(),r0.getMonth()+1,0).getDate()).keys()].map(i=>i+1);key=t=>new Date(t).getDate()-1}
+ else if(P=='year'){L=['J','F','M','A','M','J','J','A','S','O','N','D'];key=t=>new Date(t).getMonth()}
+ else{const f=t=>{const d=new Date(t);return d.getFullYear()+'-'+(d.getMonth()+1)};L=[...new Set(l.map(t=>f(t.t)))];key=t=>L.indexOf(f(t))}
+ const A=L.map(()=>0),B=L.map(()=>0);l.forEach(t=>{(t.type=='sale'?A:B)[key(t.t)]+=t.total});return[L,A,B]}
+function chart(L,A,B){if(!L.length)return'<small>Aucune donnée.</small>';const mx=Math.max(1,...A,...B),w=300/L.length;let s='<svg viewBox="0 0 320 170" width="100%">';
+ L.forEach((l,i)=>{const x=10+i*w,ha=A[i]/mx*130,hb=B[i]/mx*130;s+=`<rect x="${x+1}" y="${140-ha}" width="${w/2-1}" height="${ha}" fill="#2e9e4f"/><rect x="${x+w/2}" y="${140-hb}" width="${w/2-1}" height="${hb}" fill="#e0443e"/>`;if(L.length<=13||i%3==0)s+=`<text x="${x+w/2}" y="156" font-size="8" text-anchor="middle" fill="currentColor">${l}</text>`});
+ return s+'</svg>'}
+const rc=t=>{const w=32,ln=(a,b)=>a+' '.repeat(Math.max(1,w-a.length-b.length))+b,L='-'.repeat(w);return[S.shop,L,fd(t.t),(t.type=='sale'?'Vendeur: ':'Admin: ')+t.by,t.cust?(t.type=='sale'?'Client: ':'Fournisseur: ')+t.cust:'',...t.lines.map(i=>ln(i.q+'x '+i.n.slice(0,16),String(i.q*i.p))),L,ln('TOTAL',t.total+' '+S.cur),'','Merci de votre visite !'].join('\n')};
+async function pr(i){const t=S.tx.find(x=>x.id==i);if(!navigator.bluetooth)return al('Bluetooth indisponible ici. Ouvrez l’application dans Chrome sur Android.');
+ try{const d=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:['000018f0-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2','49535343-fe7d-4ae5-8fa9-9fafd205e455']});
+ const sv=await(await d.gatt.connect()).getPrimaryServices();let ch;for(const s of sv){ch=(await s.getCharacteristics()).find(c=>c.properties.write||c.properties.writeWithoutResponse);if(ch)break}
+ const b=new TextEncoder().encode(rc(t).normalize('NFD').replace(/[\u0300-\u036f]/g,'')+'\n\n\n'),a=new Uint8Array([27,64,...b]);
+ for(let o=0;o<a.length;o+=100)await ch.writeValue(a.slice(o,o+100));d.gatt.disconnect()}catch(e){al('Impression impossible : '+esc(e.message))}}
+function auth(){const f=!S.users.length;$('#app').innerHTML=`<div class="login"><h2>${f?'Première configuration':esc(S.shop)}</h2>${f?'<input id="sh" placeholder="Nom du commerce"><p class="m">Créez le compte administrateur</p>':''}<input id="u" placeholder="Nom d’utilisateur"><input id="pw" type="password" placeholder="Mot de passe (4 caractères min.)"><button onclick="go2()">${f?'Créer et entrer':'Connexion'}</button><p id="er" class="r"></p><small>Données stockées uniquement sur cet appareil. 100 % hors ligne.</small></div>`}
+async function go2(){const u=$('#u').value.trim(),p=$('#pw').value;if(!u||p.length<4)return $('#er').textContent='Nom requis et mot de passe de 4 caractères minimum';const H=await h(p);
+ if(!S.users.length){S.shop=$('#sh').value.trim()||S.shop;S.users.push({id:id(),name:u,pw:H,role:'admin'});save()}
+ const x=S.users.find(a=>a.name==u&&a.pw==H);if(!x)return $('#er').textContent='Identifiants incorrects';U=x;V='caisse';log('Connexion');render()}
+const go=v=>{V=v;render()};
+function render(){if(!U)return auth();
+ const T=[['caisse','📒','Caisse'],['vendre','🛒','Vendre'],['stock','📦','Stock']].concat(adm()?[['achats','📥','Achats']]:[],[['bilans','📊','Bilans']],adm()?[['audit','🔍','Audit']]:[],[['reg','⚙️','Plus']]);
+ $('#app').innerHTML=`<header><span>${esc(S.shop)}</span><small>${esc(U.name)} · ${adm()?'admin':'vendeur'}</small></header><main>${VW[V]()}</main><nav>${T.map(t=>`<a class="${V==t[0]?'on':''}" onclick="go('${t[0]}')">${t[1]}<br>${t[2]}</a>`).join('')}</nav>`}
+const lst=()=>S.items.filter(i=>i.name.toLowerCase().includes(q.toLowerCase())).map(i=>`<div class="card" style="opacity:${i.qty?1:.4}" onclick="add('${i.id}')"><span style="display:flex;gap:8px;align-items:center">${im(i)}<span>${esc(i.name)}<br><small>${fm(i.price)} · stock ${i.qty}</small></span></span><b class="g">＋</b></div>`).join('')||'<p class="m">Aucun article.</p>';
+const cartH=()=>{const t=cart.reduce((s,c)=>s+c.q*c.p,0);return cart.length?`<div class="card2"><h4>Panier</h4>${cart.map((c,i)=>`<div class="row"><span>${esc(c.n)}</span><span><b onclick="qt(${i},-1)">−</b> ${c.q} <b onclick="qt(${i},1)">＋</b> ${fm(c.q*c.p)}</span></div>`).join('')}<input id="cl" placeholder="Client (facultatif)"><button class="ok" onclick="sell()">Valider la vente · ${fm(t)}</button></div>`:''};
+const VW={
+caisse(){const l=tx().sort((a,b)=>b.t-a.t),v=sum(l,'sale'),a=sum(l,'buy');
+ return chips()+`<div class="tot"><div class="g">Ventes<br>${fm(v)}</div>${adm()?`<div class="r">Achats<br>${fm(a)}</div><div>Solde<br>${fm(v-a)}</div>`:''}</div>`+(adm()?`<small>Marge brute : ${fm(mg(l))}</small>`:'')+`<div class="row"><button class="ok" onclick="go('vendre')">Vente</button>${adm()?`<button class="r" onclick="go('achats')">Achat</button>`:''}</div>`+
+ (l.map(t=>`<div class="card" onclick="det('${t.id}')"><span>${fd(t.t)}<br><small>${t.type=='sale'?'Vente':'Achat'} · ${esc(t.lines.map(i=>i.q+'×'+i.n).join(', ').slice(0,60))}</small></span><b class="${t.type=='sale'?'g':'r'}">${fm(t.total)}</b></div>`).join('')||'<p class="m">Aucune opération sur la période.</p>')},
+vendre(){return cartH()+`<input placeholder="Rechercher un article" value="${esc(q)}" oninput="q=this.value;$('#lst').innerHTML=lst()"><div id="lst">${lst()}</div>`},
+stock(){return(adm()?'<button onclick="itf()">＋ Nouvel article</button>':'')+(S.items.map(i=>`<div class="card" ${adm()?`onclick="itf('${i.id}')"`:''}><span style="display:flex;gap:8px;align-items:center">${im(i)}<span>${esc(i.name)}<br><small>${fm(i.price)}</small></span></span><b class="${i.qty<=i.min?'r':'g'}">${i.qty}</b></div>`).join('')||'<p class="m">Aucun article.</p>')},
+achats(){return S.items.length?`<div class="card2"><h4>Achat / réapprovisionnement</h4><select id="bi" onchange="$('#bc').value=S.items.find(i=>i.id==this.value).cost">${S.items.map(i=>`<option value="${i.id}">${esc(i.name)} (stock ${i.qty})</option>`).join('')}</select><input id="bq" type="number" placeholder="Quantité"><input id="bc" type="number" placeholder="Prix d’achat unitaire" value="${S.items[0].cost}"><input id="bf" placeholder="Fournisseur (facultatif)"><button class="ok" onclick="buy()">Enregistrer l’achat</button></div>`:'<p class="m">Créez d’abord un article dans Stock.</p>'},
+bilans(){const l=tx(),[L,A,B]=buckets(l),ns=l.filter(t=>t.type=='sale').length,top={};
+ l.filter(t=>t.type=='sale').forEach(t=>t.lines.forEach(i=>top[i.n]=(top[i.n]||0)+i.q));const tp=Object.entries(top).sort((x,y)=>y[1]-x[1]).slice(0,5);
+ return chips()+`<div class="tot"><div class="g">Ventes<br>${fm(sum(l,'sale'))}</div>${adm()?`<div class="r">Achats<br>${fm(sum(l,'buy'))}</div><div>Solde<br>${fm(sum(l,'sale')-sum(l,'buy'))}</div>`:`<div>Nb ventes<br>${ns}</div>`}</div>${adm()?`<small>Marge brute : ${fm(mg(l))} · ${ns} vente(s)</small>`:''}<div class="card2">${chart(L,A,B)}<small><span class="g">■</span> Ventes ${adm()?'<span class="r">■</span> Achats':''}</small></div><div class="card2"><h4>Articles les plus vendus</h4>${tp.map(x=>`<div class="row"><span>${esc(x[0])}</span><b>${x[1]}</b></div><div style="background:var(--p);height:6px;border-radius:3px;width:${x[1]/tp[0][1]*100}%"></div>`).join('')||'<small>Aucune vente.</small>'}</div>${adm()?'<button class="gr" onclick="csv()">Exporter la période (CSV)</button>':''}`},
+audit(){const v=S.items.reduce((s,i)=>s+i.qty*i.cost,0),pv=S.items.reduce((s,i)=>s+i.qty*i.price,0),[a,b]=rg(),lg=S.log.filter(x=>x.t>=a&&x.t<b).sort((x,y)=>y.t-x.t).slice(0,60);
+ return`<div class="tot"><div>Stock (coût)<br>${fm(v)}</div><div>Stock (prix de vente)<br>${fm(pv)}</div></div><small>${S.items.filter(i=>i.qty<=i.min).length} article(s) en stock bas · ${S.tx.filter(t=>t.void).length} opération(s) annulée(s)</small><h4>Inventaire physique</h4>${S.items.map(i=>`<div class="card"><span>${esc(i.name)}<br><small>Stock théorique : ${i.qty}</small></span><button style="width:auto" onclick="adj('${i.id}')">Compter</button></div>`).join('')||'<small>Aucun article.</small>'}<h4>Journal d’audit</h4>${chips()}${lg.map(x=>`<div class="row"><small>${fd(x.t)} · ${esc(x.u)}</small><span>${esc(x.a)}</span></div>`).join('')||'<small>Rien sur cette période.</small>'}`},
+reg(){return`<div class="card2"><h4>Compte : ${esc(U.name)}</h4><input id="np" type="password" placeholder="Nouveau mot de passe"><button onclick="cp()">Changer mon mot de passe</button><button class="gr" onclick="S.dark=!S.dark;save();th();render()">Mode sombre / clair</button><button class="r" onclick="U=null;cart=[];render()">Déconnexion</button></div>`+(adm()?`<div class="card2"><h4>Commerce</h4><input id="sh" value="${esc(S.shop)}"><input id="cu" value="${esc(S.cur)}"><button onclick="S.shop=$('#sh').value||S.shop;S.cur=$('#cu').value||S.cur;save();render()">Enregistrer</button></div><div class="card2"><h4>Utilisateurs</h4>${S.users.map(u=>`<div class="row"><span>${esc(u.name)} <small>${u.role=='admin'?'admin':'vendeur'}</small></span>${u.id==U.id?'':`<b onclick="conf('Supprimer cet utilisateur ?',()=>du('${u.id}'))">🗑</b>`}</div>`).join('')}<input id="nu" placeholder="Nom"><input id="up" type="password" placeholder="Mot de passe"><select id="ur"><option value="user">Vendeur (accès restreint)</option><option value="admin">Administrateur</option></select><button onclick="au()">Ajouter</button></div><div class="card2"><h4>Données</h4><button onclick="bk()">Sauvegarde / restauration</button></div>`:'')}
+};
+function det(i){const t=S.tx.find(x=>x.id==i);modal(`<h3>${t.type=='sale'?'Vente':'Achat'}${t.void?' (annulée)':''}</h3><pre>${esc(rc(t))}</pre>${t.type=='sale'?`<button onclick="pr('${i}')">🖨 Imprimer le reçu (Bluetooth)</button>`:''}${adm()&&!t.void?`<button class="r" onclick="conf('Annuler et rétablir le stock ?',()=>vd('${i}'))">Annuler l’opération</button>`:''}<button class="gr" onclick="cm()">Fermer</button>`)}
+function vd(i){const t=S.tx.find(x=>x.id==i);t.void=1;t.lines.forEach(l=>{const a=S.items.find(x=>x.id==l.id);if(a)a.qty+=t.type=='sale'?l.q:-l.q});log('Opération annulée : '+t.total+' '+S.cur);render()}
+function add(i){const a=S.items.find(x=>x.id==i),c=cart.find(x=>x.id==i);if((c?c.q:0)+1>a.qty)return al('Stock insuffisant');c?c.q++:cart.push({id:i,n:a.name,p:a.price,c:a.cost,q:1});render()}
+function qt(i,d){const c=cart[i],a=S.items.find(x=>x.id==c.id);if(d>0&&c.q+1>a.qty)return al('Stock insuffisant');c.q+=d;if(c.q<=0)cart.splice(i,1);render()}
+function sell(){const t={id:id(),t:Date.now(),type:'sale',by:U.name,cust:($('#cl').value||'').trim(),lines:cart.map(x=>({id:x.id,n:x.n,q:x.q,p:x.p,c:x.c})),total:cart.reduce((s,x)=>s+x.q*x.p,0)};
+ t.lines.forEach(l=>{const a=S.items.find(x=>x.id==l.id);if(a)a.qty-=l.q});S.tx.push(t);log('Vente '+t.total+' '+S.cur);cart=[];render();det(t.id)}
+function buy(){const i=$('#bi').value,n=+$('#bq').value,c=+$('#bc').value;if(!i||n<=0||c<0)return al('Quantité et prix valides requis');const a=S.items.find(x=>x.id==i);
+ const t={id:id(),t:Date.now(),type:'buy',by:U.name,cust:$('#bf').value.trim(),lines:[{id:i,n:a.name,q:n,p:c,c}],total:n*c};a.qty+=n;a.cost=c;S.tx.push(t);log('Achat '+a.name+' ×'+n);go('caisse')}
+function itf(i){const x=i?S.items.find(a=>a.id==i):{name:'',price:'',cost:'',min:5,img:''};img=x.img;
+ modal(`<h3>${i?'Modifier':'Nouvel'} article</h3><input id="n" placeholder="Nom" value="${esc(x.name)}"><input id="p" type="number" placeholder="Prix de vente" value="${x.price}"><input id="c" type="number" placeholder="Prix d’achat" value="${x.cost}">${i?'':'<input id="q" type="number" placeholder="Stock initial">'}<input id="mn" type="number" placeholder="Seuil d’alerte stock bas" value="${x.min}"><p class="m">Photo de l’article :</p><input type="file" accept="image/*" onchange="ph(this)"><button onclick="svi('${i||''}')">Enregistrer</button>${i?`<button class="r" onclick="conf('Supprimer cet article ?',()=>dli('${i}'))">Supprimer</button>`:''}<button class="gr" onclick="cm()">Fermer</button>`)}
+function ph(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const g=new Image();g.onload=()=>{const c=document.createElement('canvas'),k=Math.min(1,160/Math.max(g.width,g.height));c.width=g.width*k;c.height=g.height*k;c.getContext('2d').drawImage(g,0,0,c.width,c.height);img=c.toDataURL('image/jpeg',.6)};g.src=r.result};r.readAsDataURL(f)}
+function svi(i){const n=$('#n').value.trim();if(!n)return al('Nom requis');const o={name:n,price:+$('#p').value||0,cost:+$('#c').value||0,min:+$('#mn').value||0,img};
+ if(i)Object.assign(S.items.find(a=>a.id==i),o);else S.items.push({id:id(),qty:+($('#q')||{}).value||0,...o});log((i?'Article modifié : ':'Article créé : ')+n);cm();render()}
+function dli(i){S.items=S.items.filter(a=>a.id!=i);log('Article supprimé');cm();render()}
+function adj(i){const a=S.items.find(x=>x.id==i);modal(`<h3>${esc(a.name)}</h3><p>Stock théorique : ${a.qty}</p><input id="ct" type="number" placeholder="Quantité comptée"><button onclick="sa('${i}')">Valider l’inventaire</button><button class="gr" onclick="cm()">Fermer</button>`)}
+function sa(i){const a=S.items.find(x=>x.id==i),n=$('#ct').value;if(n==='')return;log(`Inventaire ${a.name} : ${a.qty} → ${n} (écart ${n-a.qty})`);a.qty=+n;cm();render()}
+async function cp(){const p=$('#np').value;if(p.length<4)return al('4 caractères minimum');U.pw=await h(p);save();log('Mot de passe changé');al('Mot de passe modifié')}
+async function au(){const n=$('#nu').value.trim(),p=$('#up').value;if(!n||p.length<4)return al('Nom et mot de passe (4 min.) requis');if(S.users.some(u=>u.name==n))return al('Ce nom existe déjà');S.users.push({id:id(),name:n,pw:await h(p),role:$('#ur').value});log('Utilisateur ajouté : '+n);render()}
+function du(i){S.users=S.users.filter(u=>u.id!=i);log('Utilisateur supprimé');render()}
+function csv(){const r=['date;type;détail;total;par',...tx().map(t=>[fd(t.t),t.type=='sale'?'vente':'achat',t.lines.map(i=>i.q+'x'+i.n).join(' + '),t.total,t.by].join(';'))].join('\n');modal(`<h3>Export CSV</h3><p class="m">Copiez ce texte puis collez-le dans Excel ou un tableur.</p><textarea rows="10" readonly onclick="this.select()">${esc(r)}</textarea><button class="gr" onclick="cm()">Fermer</button>`)}
+function bk(){modal(`<h3>Sauvegarde</h3><p class="m">Copiez ce texte et conservez-le ailleurs. Pour restaurer, collez-le ici.</p><textarea id="bt" rows="8" onclick="this.select()">${esc(JSON.stringify(S))}</textarea><button class="r" onclick="bv=$('#bt').value;conf('Remplacer toutes les données ?',rs)">Restaurer</button><button class="gr" onclick="cm()">Fermer</button>`)}
+function rs(){try{S=JSON.parse(bv);save();U=null;th();render()}catch(e){load();al('Données invalides')}}
+load();th();render();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
